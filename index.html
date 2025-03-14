@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Document Scanning via Camera</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=0" />
+  <script src="https://cdn.jsdelivr.net/npm/dynamsoft-capture-vision-bundle@2.6.1000/dist/dcv.bundle.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dynamsoft-document-viewer@latest/dist/ddv.js"></script>
+  <script src="detectionHandler.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/dynamsoft-document-viewer@latest/dist/ddv.css">
+  <style>
+    #container {
+      max-width: 100%;
+      height: 480px;
+    }
+  </style>
+</head>
+<body>
+  <h2>Document Scanning via Camera</h2>
+  <label>
+    Camera:
+    <select id="select-camera"></select>
+  </label>
+  <label>
+    Resolution:
+    <select id="select-resolution">
+      <option value="640x480">640x480</option>
+      <option value="1280x720">1280x720</option>
+      <option value="1920x1080" selected>1920x1080</option>
+      <option value="3840x2160">3840x2160</option>
+    </select>
+  </label>
+  <button onclick="startScanning();">Start</button>
+  <div id="container"></div>
+  <script type="text/javascript">
+    let cameras = [];
+    window.onload = async function(){
+      await initMobileWebCapture();
+      await requestCameraPermission();
+      await listCameras();
+    }
+
+    async function initMobileWebCapture(){
+      Dynamsoft.Core.CoreModule.loadWasm(["DDN"]);
+      Dynamsoft.DDV.Core.loadWasm();
+
+      // Initialize DDN
+      await Dynamsoft.License.LicenseManager.initLicense(
+        "DLS2eyJoYW5kc2hha2VDb2RlIjoiMjAwMDAxLTE2NDk4Mjk3OTI2MzUiLCJvcmdhbml6YXRpb25JRCI6IjIwMDAwMSIsInNlc3Npb25QYXNzd29yZCI6IndTcGR6Vm05WDJrcEQ5YUoifQ==",
+        true
+      );
+      // Initialize DDV
+      await Dynamsoft.DDV.Core.init();
+      
+      // Configure document boundaries function
+      await initDocDetectModule(Dynamsoft.DDV, Dynamsoft.CVR);
+
+      // Configure image filter feature which is in edit viewer
+      Dynamsoft.DDV.setProcessingHandler("imageFilter", new Dynamsoft.DDV.ImageFilter());
+      const captureViewerUiConfig = {
+          type: Dynamsoft.DDV.Elements.Layout,
+          flexDirection: "column",
+          children: [
+              {
+                  type: Dynamsoft.DDV.Elements.Layout,
+                  className: "ddv-capture-viewer-header-mobile",
+                  children: [
+                      {
+                          type: "CameraResolution",
+                          className: "ddv-capture-viewer-resolution",
+                      },
+                      Dynamsoft.DDV.Elements.Flashlight,
+                  ],
+              },
+              Dynamsoft.DDV.Elements.MainView,
+              {
+                  type: Dynamsoft.DDV.Elements.Layout,
+                  className: "ddv-capture-viewer-footer-mobile",
+                  children: [
+                      Dynamsoft.DDV.Elements.AutoDetect,
+                      Dynamsoft.DDV.Elements.AutoCapture,
+                      {
+                          type: "Capture",
+                          className: "ddv-capture-viewer-captureButton",
+                      },
+                      {
+                          // Bind click event to "ImagePreview" element
+                          // The event will be registered later.
+                          type: Dynamsoft.DDV.Elements.ImagePreview,
+                          events:{ 
+                              click: "showPerspectiveViewer"
+                          }
+                      },
+                      Dynamsoft.DDV.Elements.CameraConvert,
+                  ],
+              },
+          ],
+      };
+
+
+      const perspectiveUiConfig = {
+          type: Dynamsoft.DDV.Elements.Layout,
+          flexDirection: "column",
+          children: [
+              {
+                  type: Dynamsoft.DDV.Elements.Layout,
+                  className: "ddv-perspective-viewer-header-mobile",
+                  children: [
+                      {
+                          // Add a "Back" button in perspective viewer's header and bind the event to go back to capture viewer.
+                          // The event will be registered later.
+                          type: Dynamsoft.DDV.Elements.Button,
+                          className: "ddv-button-back",
+                          events:{
+                              click: "backToCaptureViewer"
+                          }
+                      },
+                      Dynamsoft.DDV.Elements.Pagination,
+                      {   
+                          // Bind event for "PerspectiveAll" button to show the edit viewer
+                          // The event will be registered later.
+                          type: Dynamsoft.DDV.Elements.PerspectiveAll,
+                          events:{
+                              click: "showEditViewer"
+                          }
+                      },
+                  ],
+              },
+              Dynamsoft.DDV.Elements.MainView,
+              {
+                  type: Dynamsoft.DDV.Elements.Layout,
+                  className: "ddv-perspective-viewer-footer-mobile",
+                  children: [
+                      Dynamsoft.DDV.Elements.FullQuad,
+                      Dynamsoft.DDV.Elements.RotateLeft,
+                      Dynamsoft.DDV.Elements.RotateRight,
+                      Dynamsoft.DDV.Elements.DeleteCurrent,
+                      Dynamsoft.DDV.Elements.DeleteAll,
+                  ],
+              },
+          ],
+      };
+
+      const editViewerUiConfig = {
+          type: Dynamsoft.DDV.Elements.Layout,
+          flexDirection: "column",
+          className: "ddv-edit-viewer-mobile",
+          children: [
+              {
+                  type: Dynamsoft.DDV.Elements.Layout,
+                  className: "ddv-edit-viewer-header-mobile",
+                  children: [
+                      {
+                          // Add a "Back" buttom to header and bind click event to go back to the perspective viewer
+                          // The event will be registered later.
+                          type: Dynamsoft.DDV.Elements.Button,
+                          className: "ddv-button-back",
+                          events:{
+                              click: "backToPerspectiveViewer"
+                          }
+                      },
+                      Dynamsoft.DDV.Elements.Pagination,
+                      Dynamsoft.DDV.Elements.Download,
+                  ],
+              },
+              Dynamsoft.DDV.Elements.MainView,
+              {
+                  type: Dynamsoft.DDV.Elements.Layout,
+                  className: "ddv-edit-viewer-footer-mobile",
+                  children: [
+                      Dynamsoft.DDV.Elements.DisplayMode,
+                      Dynamsoft.DDV.Elements.RotateLeft,
+                      Dynamsoft.DDV.Elements.Crop,
+                      Dynamsoft.DDV.Elements.Filter,
+                      Dynamsoft.DDV.Elements.Undo,
+                      Dynamsoft.DDV.Elements.Delete,
+                      Dynamsoft.DDV.Elements.Load,
+                      Dynamsoft.DDV.Elements.AnnotationSet,
+                  ],
+              },
+          ],
+      };
+      // Create a capture viewer
+      captureViewer = new Dynamsoft.DDV.CaptureViewer({
+          container: "container",
+          uiConfig: captureViewerUiConfig,
+          viewerConfig: {
+              acceptedPolygonConfidence: 60,
+              enableAutoDetect: false,
+          }
+      });
+
+      // Register an event in `captureViewer` to show the perspective viewer
+      captureViewer.on("showPerspectiveViewer",() => {
+          switchViewer(0,1,0);
+      });
+
+      // Create a perspective viewer
+      perspectiveViewer = new Dynamsoft.DDV.PerspectiveViewer({
+          container: "container",
+          groupUid: captureViewer.groupUid,
+          uiConfig: perspectiveUiConfig,
+          viewerConfig: {
+              scrollToLatest: true,
+          }
+      });
+
+      perspectiveViewer.hide();
+
+      // Register an event in `perspectiveViewer` to go back the capture viewer
+      perspectiveViewer.on("backToCaptureViewer",() => {
+          switchViewer(1,0,0);
+          captureViewer.play().catch(err => {alert(err.message)});
+      });
+
+      // Register an event in `perspectiveViewer` to show the edit viewer
+      perspectiveViewer.on("showEditViewer",() => {
+          switchViewer(0,0,1)
+      });
+      
+      // Create an edit viewer
+      editViewer = new Dynamsoft.DDV.EditViewer({
+          container: "container",
+          groupUid: captureViewer.groupUid,
+          uiConfig: editViewerUiConfig
+      });
+
+      editViewer.hide();
+
+      // Register an event in `editViewer` to go back the perspective viewer
+      editViewer.on("backToPerspectiveViewer",() => {
+          switchViewer(0,1,0);
+      });
+
+      // Define a function to control the viewers' visibility
+      const switchViewer = (c,p,e) => {
+        captureViewer.hide();
+        perspectiveViewer.hide();
+        editViewer.hide();
+
+        if(c) {
+          captureViewer.show();
+        } else {
+          captureViewer.stop();
+        }
+        
+        if(p) perspectiveViewer.show();
+        if(e) editViewer.show();
+      };
+    }
+
+    async function listCameras(){
+      let cameraSelect = document.getElementById("select-camera");
+      let allDevices = await navigator.mediaDevices.enumerateDevices();
+      for (let i = 0; i < allDevices.length; i++){
+        let device = allDevices[i];
+        if (device.kind == 'videoinput'){
+          cameras.push(device);
+          cameraSelect.appendChild(new Option(device.label,device.deviceId));
+        }
+      }
+    }
+
+    async function requestCameraPermission() {
+      try {
+        const constraints = {video: true, audio: false};
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        closeStream(stream);
+      } catch (error) {
+        console.log(error);
+        throw error;
+      }
+    }
+    function closeStream(stream){
+      if (stream) {
+        const tracks = stream.getTracks();
+        for (let i=0;i<tracks.length;i++) {
+          const track = tracks[i];
+          track.stop();  // stop the opened tracks
+        }
+      }
+    }
+
+    async function startScanning(){
+      let selectedCamera = cameras[document.getElementById("select-camera").selectedIndex];
+      await captureViewer.selectCamera(selectedCamera.deviceId);
+      let selectedResolution = document.getElementById("select-resolution").selectedOptions[0].value;
+      let width = parseInt(selectedResolution.split("x")[0]);
+      let height = parseInt(selectedResolution.split("x")[1]);
+      // Play video stream in 1080P
+      captureViewer.play({
+        resolution: [width,height],
+      }).catch(err => {
+        alert(err.message)
+      });
+    }
+  </script>
+</body>
+</html>
