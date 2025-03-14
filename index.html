@@ -158,6 +158,12 @@
             <input type="number" id="docHeight" value="51" />
           </label>
         </div>
+        <div>
+          <label>
+            Directly resize the image:
+            <input type="checkbox" id="directResize" checked />
+          </label>
+        </div>
       </div>
       <button onclick="resize();">Resize</button>
       <button onclick="hideResizeModal();">Cancel</button>
@@ -442,32 +448,43 @@
       let pageHeightPx = pageHeight * DPI / 25.4;
       let docWidthPx = docWidth * DPI / 25.4;
       let docHeightPx = docHeight * DPI / 25.4;
-      let pageBlob = await createEmptyPage(pageWidthPx,pageHeightPx);
-      let docImageBlob = (await editViewer.currentDocument.getPageData(pageUid)).display.data;
-      let img = document.createElement("img");
-      img.onload = async function(){
-        let resizedDocBlob = await resizeImage(img,docWidthPx,docHeightPx);
-        await editViewer.currentDocument.updatePage(pageUid, pageBlob);
-        let newPageData = await editViewer.currentDocument.getPageData(pageUid);
-        let ratio = newPageData.cropBox.width / newPageData.display.width;
-        const rect = {
-          x: 50,
-          y: 50,
-          width: docWidthPx * ratio,
-          height: docHeightPx * ratio
+      let directResize = document.getElementById("directResize").checked;
+      if (directResize){
+        let docImageBlob = (await editViewer.currentDocument.getPageData(pageUid)).display.data;
+        let img = document.createElement("img");
+        img.onload = async function(){
+          let resizedDocBlob = await resizeImage(img,docWidthPx,docHeightPx);
+          await editViewer.currentDocument.updatePage(pageUid, resizedDocBlob);
         };
-        const options = {
-          x: rect.x,
-          y: rect.y,
-          width: rect.width,
-          height: rect.height,
-          stamp: resizedDocBlob 
-        };
-        const stamp = await Dynamsoft.DDV.annotationManager.createAnnotation(pageUid, "stamp", options);
-        console.log(stamp);
-        hideResizeModal();
+        img.src = URL.createObjectURL(docImageBlob);
+      } else {
+        let pageBlob = await createEmptyPage(pageWidthPx,pageHeightPx);
+        let docImageBlob = (await editViewer.currentDocument.getPageData(pageUid)).display.data;
+        let img = document.createElement("img");
+        img.onload = async function(){
+          let resizedDocBlob = await resizeImage(img,docWidthPx,docHeightPx);
+          await editViewer.currentDocument.updatePage(pageUid, pageBlob);
+          let newPageData = await editViewer.currentDocument.getPageData(pageUid);
+          let ratio = newPageData.cropBox.width / newPageData.display.width;
+          const rect = {
+            x: 50,
+            y: 50,
+            width: docWidthPx * ratio,
+            height: docHeightPx * ratio
+          };
+          const options = {
+            x: rect.x,
+            y: rect.y,
+            width: rect.width,
+            height: rect.height,
+            stamp: resizedDocBlob 
+          };
+          const stamp = await Dynamsoft.DDV.annotationManager.createAnnotation(pageUid, "stamp", options);
+          console.log(stamp);
+          hideResizeModal();
+        }
+        img.src = URL.createObjectURL(docImageBlob);
       }
-      img.src = URL.createObjectURL(docImageBlob);
     }
 
     function resizeImage(image, width, height) {
