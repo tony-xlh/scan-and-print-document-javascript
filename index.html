@@ -42,6 +42,10 @@
       visibility: inherit;
     }
 
+    .info-modal.active {
+      visibility: inherit;
+    }
+
     .ddv-button-menu {
       background-image: url("menu.svg");
       background-position: center;
@@ -169,10 +173,15 @@
       <button onclick="hideResizeModal();">Cancel</button>
     </div>
   </div>
+  <div class="modal info-modal">
+    <pre id="info"></pre>
+    <button onclick="hideInfoModal();">Close</button>
+  </div>
   <div class="menu">
     <div class="menu-item">Download as PDF</div>
     <div class="menu-item">Download as JPEG</div>
     <div class="menu-item">Resize the Image for Printing</div>
+    <div class="menu-item">Check Image Info</div>
     <div class="menu-item">Cancel</div>
   </div>
   <script type="text/javascript">
@@ -188,9 +197,26 @@
           showResizeModal();
         }else if (e.target.innerText == "Download as JPEG"){
           downloadAsJPEG();
+        }else if (e.target.innerText == "Check Image Info"){
+          checkImageInfo();
         }
         hideActionMenu();
       });
+    }
+
+    async function checkImageInfo(){
+      let pageUid = editViewer.getCurrentPageUid();
+      let pageData = await editViewer.currentDocument.getPageData(pageUid);
+      console.log(pageData);
+      let normalizedWidth = 210;
+      let normalizedHeight = normalizedWidth / (pageData.display.width / pageData.display.height);
+      let info = {
+        "Width": pageData.display.width,
+        "Height": pageData.display.height,
+        "Ratio": normalizedWidth + "x" + normalizedHeight
+      };
+      document.getElementById("info").innerText = JSON.stringify(info,null,2);
+      showInfoModal();
     }
 
     async function initMobileWebCapture(){
@@ -427,6 +453,14 @@
 
     function hideResizeModal(){
       document.getElementsByClassName("resize-modal")[0].classList.remove("active");
+    }
+
+    function showInfoModal(){
+      document.getElementsByClassName("info-modal")[0].classList.add("active");
+    }
+
+    function hideInfoModal(){
+      document.getElementsByClassName("info-modal")[0].classList.remove("active");
     }
 
     function showDownloadModal(){
