@@ -25,7 +25,7 @@ const imageFromBlob = async (blob) => {
 
 class ImageFilter extends Dynamsoft.DDV.ImageFilter {
   async applyFilter(image, type) {
-    if (type === "removeShadow") {
+    if (type === "adaptive") {
       let img = await imageFromBlob(image.data);
       let blackwhiteFilter = new BlackwhiteFilter(filterCanvas,127,true,true,31,10);
       blackwhiteFilter.process(img);
@@ -33,7 +33,15 @@ class ImageFilter extends Dynamsoft.DDV.ImageFilter {
       return new Promise((r, _j) => {
         r(blob)
       });
-    }else{
+    } else if (type === "clean") {
+      console.log(image);
+      const imageProcess = Dynamsoft.DDV.Experiments.get("ImageProcess");
+      const result = await imageProcess.process({type:3, data:image.data}, {type:3/*removeshadow*/, params:{level:1,alpha:1/*cannot set 0*/}});
+      const blob = new Blob([result.output],{type:result.outputContentType});
+      return new Promise((r, _j) => {
+        r(blob)
+      });
+    } else{
       return super.applyFilter(image, type);
     }
   };
@@ -45,8 +53,9 @@ class ImageFilter extends Dynamsoft.DDV.ImageFilter {
       {type: "none", label: "Original"},
       {type: "blackAndWhite", label: "B&W"},
       {type: "gray", label: "Grayscale"},
+      {type: "clean", label: "Clean"},
       {type: "saveInk", label: "SaveToner"},
-      {type: "removeShadow", label: "RemoveShadow"},
+      {type: "adaptive", label: "B&W (adaptive)"},
     ]
   };
   destroy() {
