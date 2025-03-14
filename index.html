@@ -5,7 +5,12 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=0" />
   <script src="https://cdn.jsdelivr.net/npm/dynamsoft-capture-vision-bundle@2.6.1000/dist/dcv.bundle.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dynamsoft-document-viewer@latest/dist/ddv.js"></script>
+  <script type="module">
+    import { BlackwhiteFilter } from 'https://cdn.jsdelivr.net/npm/image-filter-js/dist/image-filter.js';
+    window.BlackwhiteFilter = BlackwhiteFilter;
+  </script>
   <script src="detectionHandler.js"></script>
+  <script src="filterHandler.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/dynamsoft-document-viewer@latest/dist/ddv.css">
   <style>
     #container {
@@ -78,6 +83,10 @@
 
     .setting-item {
       padding: 10px 0;
+    }
+
+    .ddv-filter-item {
+      width: auto!important;
     }
   </style>  
 </head>
@@ -190,7 +199,7 @@
       await initDocDetectModule(Dynamsoft.DDV, Dynamsoft.CVR);
 
       // Configure image filter feature which is in edit viewer
-      Dynamsoft.DDV.setProcessingHandler("imageFilter", new Dynamsoft.DDV.ImageFilter());
+      setImageFilterHandler();
       const captureViewerUiConfig = {
           type: Dynamsoft.DDV.Elements.Layout,
           flexDirection: "column",
