@@ -32,7 +32,54 @@
     .download-modal.active {
       visibility: inherit;
     }
-  </style>
+
+    .resize-modal.active {
+      visibility: inherit;
+    }
+
+    .ddv-button-menu {
+      background-image: url("menu.svg");
+      background-position: center;
+      background-size: contain;
+      background-repeat: no-repeat;
+      height: 1.5em !important;
+      filter: invert(1);
+    }
+
+    .menu {
+      display: none;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      min-height: 100px;
+      background: white;
+      z-index: 100;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+    }
+
+    .menu.active {
+      display: flex;
+    }
+
+    .menu-item {
+      padding: 10px;
+      background: white;
+      width: calc(100% - 30px);
+      border: 1px solid;
+      margin-left: 5px;
+      margin-right: 5px;
+      cursor: pointer;
+      text-align: center;
+      border-radius: 10px;
+    }
+
+    .setting-item {
+      padding: 10px 0;
+    }
+  </style>  
 </head>
 <body>
   <h2>Document Scanning via Camera</h2>
@@ -53,18 +100,61 @@
   <div id="container"></div>
   <div class="modal download-modal">
     <div>
-      <label>
-        Page Size:
-        <select id="page-size-select">
-          <option value="page/default">Default</option>
-          <option value="page/a4">A4</option>
-          <option value="page/a3">A3</option>
-          <option value="page/letter">Letter</option>
-        </select>
-      </label>
-      <br/>
+      <div>Please select which page size to use for the exported PDF.</div>
+      <div class="setting-item">
+        <label>
+          Page Size:
+          <select id="page-size-select">
+            <option value="page/default">Default</option>
+            <option value="page/a4">A4</option>
+            <option value="page/a3">A3</option>
+            <option value="page/letter">Letter</option>
+          </select>
+        </label>
+      </div>
       <button onclick="downloadAsPDF();">Download as PDF</button>
     </div>
+  </div>
+  <div class="modal resize-modal">
+    <div>
+      <div>Please set how to fit the image for printing.</div>
+      <div class="setting-item">
+        Page Size:
+        <div>
+          <label>
+            Width (mm):
+            <input type="number" id="pageWidth" value="210" />
+          </label>
+        </div>
+        <div>
+          <label>
+            Height (mm):
+            <input type="number" id="pageHeight" value="270" />
+          </label>
+        </div>
+      </div>
+      <div class="setting-item">
+        Document size:
+        <div>
+          <label>
+            Width (mm):
+            <input type="number" id="docWidth" value="89" />
+          </label>
+        <div>
+        </div>
+          <label>
+            Height (mm):
+            <input type="number" id="docHeight" value="51" />
+          </label>
+        </div>
+      </div>
+      <button onclick="resize();">Resize</button>
+    </div>
+  </div>
+  <div class="menu">
+    <div class="menu-item">Download as PDF</div>
+    <div class="menu-item">Resize the Image for Printing</div>
+    <div class="menu-item">Cancel</div>
   </div>
   <script type="text/javascript">
     let cameras = [];
@@ -72,6 +162,14 @@
       await initMobileWebCapture();
       await requestCameraPermission();
       await listCameras();
+      document.getElementsByClassName("menu")[0].addEventListener("click",function(e){
+        if (e.target.innerText == "Download as PDF"){
+          showDownloadModal();
+        } else if (e.target.innerText == "Resize the Image for Printing"){
+          showResizeModal();
+        }
+        hideActionMenu();
+      });
     }
 
     async function initMobileWebCapture(){
@@ -193,14 +291,13 @@
                               click: "backToPerspectiveViewer"
                           }
                       },
-                      Dynamsoft.DDV.Elements.Pagination,
                       {
                           type: Dynamsoft.DDV.Elements.Button,
-                          className: "ddv-button-download",
+                          className: "ddv-button-menu",
                           events:{
-                              click: "download"
+                              click: "menu"
                           }
-                      },
+                      }
                   ],
               },
               Dynamsoft.DDV.Elements.MainView,
@@ -272,9 +369,9 @@
           switchViewer(0,1,0);
       });
 
-      editViewer.on("download",() => {
+      editViewer.on("menu",() => {
         console.log("download");
-        showDownloadModal();
+        showActionMenu();
       });
 
       // Define a function to control the viewers' visibility
@@ -294,12 +391,94 @@
       };
     }
 
+    function showActionMenu(){
+      document.getElementsByClassName("menu")[0].classList.add("active");
+    }
+
+    function hideActionMenu(){
+      document.getElementsByClassName("menu")[0].classList.remove("active");
+    }
+
+    function showResizeModal(){
+      document.getElementsByClassName("resize-modal")[0].classList.add("active");
+    }
+
+    function hideResizeModal(){
+      document.getElementsByClassName("resize-modal")[0].classList.remove("active");
+    }
+
     function showDownloadModal(){
       document.getElementsByClassName("download-modal")[0].classList.add("active");
     }
 
     function hideDownloadModal(){
       document.getElementsByClassName("download-modal")[0].classList.remove("active");
+    }
+
+    async function resize(){
+      let pageWidth = document.getElementById("pageWidth").value;
+      let pageHeight = document.getElementById("pageHeight").value;
+      let docWidth = document.getElementById("docWidth").value;
+      let docHeight = document.getElementById("docHeight").value;
+      let DPI = 300;
+      let pageUid = editViewer.getCurrentPageUid();
+      let pageWidthPx = pageWidth * DPI / 25.4;
+      let pageHeightPx = pageHeight * DPI / 25.4;
+      let docWidthPx = docWidth * DPI / 25.4;
+      let docHeightPx = docHeight * DPI / 25.4;
+      let pageBlob = await createEmptyPage(pageWidthPx,pageHeightPx);
+      let docImageBlob = (await editViewer.currentDocument.getPageData(pageUid)).display.data;
+      let img = document.createElement("img");
+      img.onload = async function(){
+        let resizedDocBlob = await resizeImage(img,docWidthPx,docHeightPx);
+        await editViewer.currentDocument.updatePage(pageUid, pageBlob);
+        let newPageData = await editViewer.currentDocument.getPageData(pageUid);
+        let ratio = newPageData.cropBox.width / newPageData.display.width;
+        const rect = {
+          x: 50,
+          y: 50,
+          width: docWidthPx * ratio,
+          height: docHeightPx * ratio
+        };
+        const options = {
+          x: rect.x,
+          y: rect.y,
+          width: rect.width,
+          height: rect.height,
+          stamp: resizedDocBlob 
+        };
+        const stamp = await Dynamsoft.DDV.annotationManager.createAnnotation(pageUid, "stamp", options);
+        console.log(stamp);
+        hideResizeModal();
+      }
+      img.src = URL.createObjectURL(docImageBlob);
+    }
+
+    function resizeImage(image, width, height) {
+      return new Promise((resolve, reject) => {
+        let canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        let ctx = canvas.getContext("2d");
+        ctx.drawImage(image, 0, 0, width, height);
+        canvas.toBlob(blob => {
+          resolve(blob);
+        });
+      });
+    }
+
+    function createEmptyPage(width,height){
+      return new Promise((resolve, reject) => {
+        let canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        let ctx = canvas.getContext("2d");
+        ctx.fillStyle = "white";
+        ctx.fillRect(0,0,width,height);
+        canvas.toBlob(blob => {
+          resolve(blob);
+        });  
+      })
     }
 
     async function downloadAsPDF(){
@@ -310,6 +489,7 @@
       };
       const blob = await editViewer.currentDocument.saveToPdf(pdfSettings);
       downloadBlob(blob,"document.pdf");
+      hideDownloadModal();
     };
 
     function downloadBlob(blob,filename){
