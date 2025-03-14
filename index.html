@@ -165,6 +165,7 @@
   </div>
   <div class="menu">
     <div class="menu-item">Download as PDF</div>
+    <div class="menu-item">Download as JPEG</div>
     <div class="menu-item">Resize the Image for Printing</div>
     <div class="menu-item">Cancel</div>
   </div>
@@ -179,6 +180,8 @@
           showDownloadModal();
         } else if (e.target.innerText == "Resize the Image for Printing"){
           showResizeModal();
+        }else if (e.target.innerText == "Download as JPEG"){
+          downloadAsJPEG();
         }
         hideActionMenu();
       });
@@ -504,6 +507,12 @@
       downloadBlob(blob,"document.pdf");
       hideDownloadModal();
     };
+
+    async function downloadAsJPEG(){
+      let index = editViewer.getCurrentPageIndex();
+      let blob = await editViewer.currentDocument.saveToJpeg(index, {quality: 100,saveAnnotation: true});
+      downloadBlob(blob,"document.jpg");
+    }
 
     function downloadBlob(blob,filename){
       const url = URL.createObjectURL(blob);
